@@ -6,7 +6,7 @@ const meta = {
     author: "rapido",
     description: "Generate responses using GoodyAI",
     method: "get",
-    category: "ai",
+    category: "AI",
     path: "/goody?q="
 };
 

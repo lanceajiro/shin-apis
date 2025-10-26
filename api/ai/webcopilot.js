@@ -4,7 +4,7 @@ const meta = {
   name: 'WebPilot',
   path: '/webpilot?q=',
   method: 'get',
-  category: 'ai'
+  category: 'AI'
 };
 
 class WebPilotAPI {
