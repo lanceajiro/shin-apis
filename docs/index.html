@@ -131,60 +131,40 @@
     </header>
 
     <main class="max-w-2xl mx-auto px-8 py-10">
-        <div class="text-left mb-4">
-            <p class="text-gray-400 text-xs mb-4">Hi Visitor! Welcome To</p>
-            <h2 class="inline-flex text-3xl text-gray-100 font-bold mb-5 border-b-2 border-gray-500 pb-2"></h2>
-            <p class="text-gray-500 text-xs mx-auto mb-4"></p>
-            <div id="linksDiv" class="mb-5 text-xs space-y-1"></div>
+        <div class="text-center mb-8">
+            <img id="headerImage" src="" alt="Header" class="mx-auto rounded-xl mb-6 w-[80%] md:w-[40%] lg:w-[40%]">
+            <h2 id="apiTitle" class="text-3xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-purple-600 text-transparent bg-clip-text"></h2>
+            <p id="apiDescription" class="text-base text-gray-400 mb-6"></p>
+            <div class="inline-flex items-center bg-green-900/50 text-green-400 px-4 py-2 rounded-full text-sm font-medium mx-auto">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                <span id="apiStatus"></span>
+            </div>
         </div>
 
-        <div class="bg-black border border-gray-700 p-4 mb-4 rounded-lg shadow-xl transition-all hover:shadow-2xl">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="text-center">
-                    <div class="text-lg font-bold text-gray-100 flex justify-center items-center rounded-lg" id="totalEndpoints">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-1 text-purple-400">
-                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                            <path d="M12 12v8"/>
-                            <path d="M8 10l4 4 4-4"/>
-                        </svg>
-                    </div>
-                    <div class="text-xs text-gray-500">Total Endpoints</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-black rounded-lg p-6 border border-gray-700 shadow-xl transition-all hover:shadow-2xl">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="text-base font-semibold bg-gradient-to-r from-purple-400 to-purple-600 text-transparent bg-clip-text">Total APIs</h3>
+                    <i class="fa-regular fa-clipboard text-purple-400 text-xl"></i>
                 </div>
-                <div class="text-center">
-                    <div class="text-lg font-bold text-gray-100 flex justify-center items-center rounded-lg" id="totalCategories"><i class="fa-solid fa-shapes mr-1 text-purple-400"></i></div>
-                    <div class="text-xs text-gray-500">Categories</div>
+                <div class="flex items-baseline">
+                    <span id="totalEndpoints" class="text-2xl font-bold text-gray-200"></span>
+                    <span class="text-sm text-gray-500 ml-1">endpoints</span>
+                </div>
+            </div>
+            <div class="bg-black rounded-lg p-6 border border-gray-700 shadow-xl transition-all hover:shadow-2xl">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="text-base font-semibold bg-gradient-to-r from-purple-400 to-purple-600 text-transparent bg-clip-text">Categories</h3>
+                    <i class="fa-solid fa-layer-group text-green-400 text-xl"></i>
+                </div>
+                <div class="flex items-baseline">
+                    <span id="totalCategories" class="text-2xl font-bold text-gray-200"></span>
+                    <span class="text-sm text-gray-500 ml-1">groups</span>
                 </div>
             </div>
         </div>
 
-        <div class="bg-black p-6 mb-4 border border-gray-700 rounded-lg shadow-xl transition-all hover:shadow-2xl">
-            <h2 class="text-xl font-bold mb-4 flex items-center text-gray-100"><span class="material-icons mr-2 text-purple-400">rocket_launch</span> Getting Started</h2>
-            <ol class="space-y-6">
-                <li class="flex">
-                    <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-purple-600 to-purple-400 text-white font-bold text-center leading-8 mr-4 rounded-lg transition-all hover:opacity-90">1</div>
-                    <div>
-                        <h3 class="font-bold text-gray-100">Choose Your Category</h3>
-                        <p class="text-gray-400 text-xs">Browse through available API categories on sidebar and select what you need.</p>
-                    </div>
-                </li>
-                <li class="flex">
-                    <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-purple-600 to-purple-400 text-white font-bold text-center leading-8 mr-4 rounded-lg transition-all hover:opacity-90">2</div>
-                    <div>
-                        <h3 class="font-bold text-gray-100">Read the Docs</h3>
-                        <p class="text-gray-400 text-xs">Check endpoint parameters, response format, and example usage.</p>
-                    </div>
-                </li>
-                <li class="flex">
-                    <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-purple-600 to-purple-400 text-white font-bold text-center leading-8 mr-4 rounded-lg transition-all hover:opacity-90">3</div>
-                    <div>
-                        <h3 class="font-bold text-gray-100">Make Your Request</h3>
-                        <p class="text-gray-400 text-xs">Send HTTP requests and integrate the JSON response into your app.</p>
-                    </div>
-                </li>
-            </ol>
-        </div>
-
-        <div class="flex flex-col mt-6">
+        <div class="text-center mt-6">
             <p class="text-gray-500 text-xs">Thx To All Users And Contributors.</p>
             <p id="footerCopyright" class="text-gray-500 text-xs"></p>
         </div>
@@ -244,14 +224,16 @@
                 const setRes = await fetch('/set');
                 const setData = await setRes.json();
 
-                document.title = `${setData.name}.`;
+                document.title = setData.name;
                 document.querySelector('meta[name="description"]').content = setData.description;
-                document.querySelector('meta[property="og:title"]').content = `${setData.name}.`;
+                document.querySelector('meta[property="og:title"]').content = setData.name;
                 document.querySelector('meta[property="og:description"]').content = setData.description;
                 document.querySelector('link[rel="icon"]').href = setData.icon;
-                document.querySelector('h2').textContent = `${setData.name}.`;
-                document.querySelector('p.mx-auto.mb-4').textContent = setData.description;
-                document.getElementById('footerCopyright').textContent = `© ${setData.name}. | All Rights Reserved.`;
+                document.getElementById('apiTitle').textContent = setData.name;
+                document.getElementById('apiDescription').textContent = setData.description;
+                document.getElementById('headerImage').src = setData.header.imageSrc[0];
+                document.getElementById('apiStatus').textContent = setData.header.status;
+                document.getElementById('footerCopyright').textContent = `© ${setData.name} | All Rights Reserved.`;
 
                 // Notifications
                 const cleared = localStorage.getItem('notificationsCleared') === 'true';
@@ -275,8 +257,8 @@
                 const endpointsData = await endpointsRes.json();
                 const endpoints = endpointsData.endpoints;
 
-                document.getElementById('totalEndpoints').innerHTML = `<i class="fa-solid fa-gem mr-1 text-purple-400"></i>${endpointsData.count}`;
-                document.getElementById('totalCategories').innerHTML = `<i class="fa-solid fa-shapes mr-1 text-purple-400"></i>${endpoints.length}`;
+                document.getElementById('totalEndpoints').textContent = endpointsData.count;
+                document.getElementById('totalCategories').textContent = endpoints.length;
 
                 let sidebarHtml = `
                     <a href="/" class="flex items-center px-3 py-2 text-gray-100 hover:bg-gray-700 rounded-md transition-all hover:shadow-sm ${location.pathname === '/' ? 'bg-gray-700' : ''}">
