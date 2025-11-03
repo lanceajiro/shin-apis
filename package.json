@@ -1,7 +1,7 @@
 {
-  "name": "shin-api-ui",
+  "name": "Shin-API-UI-V2",
   "version": "1.0.0",
-  "description": "Open-source user interface for GET endpoints backend.",
+  "description": "Open-source user interface for GET and POST endpoints backend.",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
