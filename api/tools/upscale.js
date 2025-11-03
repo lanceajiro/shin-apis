@@ -1,17 +1,29 @@
+// Modified upscale.js
 const axios = require('axios');
 
 const meta = {
     name: "Upscale Image",
-    version: "1.0.0",
-    author: "rapido",
+    desc: "Upscale an image using pxpic.com API",
+    method: [ 'get', 'post' ],
     category: "tools",
-    method: "GET",
-    path: "/upscale-image?imageUrl=https://www.thispersondoesnotexist.com"
+    params: [
+      {
+        name: 'imageUrl',
+        description: 'URL of the image to upscale',
+        example: 'https://www.thispersondoesnotexist.com',
+        required: true
+      }
+    ]
 };
 
 async function onStart({ res, req }) {
-    const { imageUrl } = req.query;
-    if (!imageUrl) return res.status(400).json({ error: "imageUrl parameter required" });
+    let imageUrl;
+    if (req.method === 'POST') {
+      ({ imageUrl } = req.body);
+    } else {
+      ({ imageUrl } = req.query);
+    }
+    if (!imageUrl) return res.status(400).json({ error: "Missing required parameter: imageUrl" });
 
     try {
         const response = await axios.post('https://pxpic.com/callAiFunction', {
@@ -41,13 +53,12 @@ async function onStart({ res, req }) {
             }
         });
 
-        res.json({
-            resultImageUrl: response.data.resultImageUrl
+        return res.json({
+            answer: response.data.resultImageUrl
         });
     } catch (error) {
-        res.status(500).json({ 
-            error: "Image upscaling failed",
-            details: error.response?.data || error.message
+        return res.status(500).json({ 
+            error: error.message || 'Internal server error'
         });
     }
 }

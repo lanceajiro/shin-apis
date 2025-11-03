@@ -1,20 +1,36 @@
+// Modified copilot.js
 const WebSocket = require('ws');
 const axios = require('axios');
 
 const meta = {
   name: 'copilot',
   desc: 'chat with Microsoft Copilot AI via WebSocket connection',
-  method: 'get',
+  method: [ 'get', 'post' ],
   category: 'AI',
-  guide: {
-    message: 'The user message or query to send to Copilot AI',
-    model: 'The AI model (default, think-deeper, gpt-5)'
-  },
-  params: ['message', 'model']
+  params: [
+    {
+      name: 'message',
+      description: 'The user message or query to send to Copilot AI',
+      example: 'Hello, how are you?',
+      required: true
+    }, 
+    { 
+      name: 'model',
+      description: 'The AI model (default, think-deeper, gpt-5)',
+      example: 'default',
+      required: false
+    }
+  ]
 };
 
 async function onStart({ req, res }) {
-  const { message, model = 'default' } = req.query;
+  let message, model;
+  if (req.method === 'POST') {
+    ({ message, model } = req.body);
+  } else {
+    ({ message, model } = req.query);
+  }
+  model = model || 'default';
 
   if (!message) {
     return res.status(400).json({
@@ -92,7 +108,9 @@ async function onStart({ req, res }) {
             break;
 
           case 'done':
-            res.json(response);
+            res.json({
+              answer: response.text
+            });
             ws.close();
             break;
 

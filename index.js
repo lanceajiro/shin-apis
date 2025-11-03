@@ -1,3 +1,4 @@
+// Modified app.js
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -83,12 +84,12 @@ const chalk = require('chalk');
             });
 
             let displayPath = route;
-            if (Array.isArray(mod.meta?.params) && mod.meta.params.length) {
-              displayPath += '?' + mod.meta.params.map(p => `${p}=`).join('&');
+            if (mod.meta.params && Array.isArray(mod.meta.params)) {
+              displayPath += '?' + mod.meta.params.map(p => `${p.name}=`).join('&');
             } else if (mod.meta.path) {
               const [pathPart, queryPart] = mod.meta.path.split('?');
               if (pathPart !== `/${name}`) {
-                logger.warn(`meta.path path part does not match endpoint name for ${name}: expected /${name}, got ${pathPart}`);
+                logger.warn(`meta.path part does not match endpoint name for ${name}: expected /${name}, got ${pathPart}`);
               }
               displayPath += queryPart ? `?${queryPart}` : '';
             }
@@ -99,13 +100,12 @@ const chalk = require('chalk');
               endpoints.push(bucket);
             }
 
+            const methods = Array.isArray(mod.meta.method) ? mod.meta.method.map(m => m.toUpperCase()) : [mod.meta.method?.toUpperCase() || 'GET'];
+
             bucket.items.push({
-              [mod.meta.name || name]: {
-                desc: mod.meta.desc || mod.meta.description || 'No description provided',
-                path: displayPath,
-                method: mod.meta.method?.toUpperCase() || 'GET',
-                guide: mod.meta.guide || {}
-              },
+              ...mod.meta,
+              path: displayPath,
+              methods: methods
             });
 
             logger.ready(
@@ -124,7 +124,7 @@ const chalk = require('chalk');
     res.sendFile(path.join(__dirname, 'docs', 'intro.html'));
   });
 
-app.get('/dashboard', (req, res) => {
+  app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'docs', 'dashboard.html'));
   });
 

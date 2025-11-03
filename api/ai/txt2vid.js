@@ -1,14 +1,19 @@
+// Modified txt2vid.js
 const axios = require('axios');
 
 const meta = {
   name: 'Text To Video',
   desc: 'Generate a video URL from a text prompt using soli.aritek.app txt2videov3 endpoint',
-  method: 'get',
+  method: [ 'get', 'post' ],
   category: 'AI',
-  guide: {
-    prompt: 'The text prompt describing the video you want to generate',
-  },
-  params: ['prompt'],
+  params: [
+    {
+      name: 'prompt',
+      description: 'The text prompt describing the video you want to generate',
+      example: 'A cat playing with a ball',
+      required: true
+    }
+  ]
 };
 
 async function txt2video(prompt) {
@@ -69,26 +74,28 @@ async function txt2video(prompt) {
 }
 
 async function onStart({ req, res }) {
-  const { prompt } = req.query;
+  let prompt;
+  if (req.method === 'POST') {
+    ({ prompt } = req.body);
+  } else {
+    ({ prompt } = req.query);
+  }
 
   if (!prompt) {
     return res.status(400).json({
-      error: 'Missing required parameter: prompt',
-      timestamp: new Date().toISOString(),
+      error: 'Missing required parameter: prompt'
     });
   }
 
   try {
     const url = await txt2video(prompt);
 
-    return res.status(200).json({
-      result: { url },
-      timestamp: new Date().toISOString(),
+    return res.json({
+      answer: url
     });
   } catch (err) {
     return res.status(500).json({
-      error: err?.message || 'Internal server error',
-      timestamp: new Date().toISOString(),
+      error: err?.message || 'Internal server error'
     });
   }
 }

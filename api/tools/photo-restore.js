@@ -1,17 +1,29 @@
+// Modified photo-restore.js
 const axios = require('axios');
 
 const meta = {
     name: "Old Photo Restoration",
-    version: "1.0.0",
-    author: "rapido",
+    desc: "Restore an old photo using pxpic.com API",
+    method: [ 'get', 'post' ],
     category: "tools",
-    method: "GET",
-    path: "/restore?imageUrl="
+    params: [
+      {
+        name: 'imageUrl',
+        description: 'URL of the old photo to restore',
+        example: 'https://example.com/old-photo.jpg',
+        required: true
+      }
+    ]
 };
 
 async function onStart({ res, req }) {
-    const { imageUrl } = req.query;
-    if (!imageUrl) return res.status(400).json({ error: "imageUrl parameter required" });
+    let imageUrl;
+    if (req.method === 'POST') {
+      ({ imageUrl } = req.body);
+    } else {
+      ({ imageUrl } = req.query);
+    }
+    if (!imageUrl) return res.status(400).json({ error: "Missing required parameter: imageUrl" });
 
     try {
         const response = await axios.post('https://pxpic.com/callAiFunction', {
@@ -41,11 +53,12 @@ async function onStart({ res, req }) {
             }
         });
 
-        res.json(response.data.resultImageUrl);
+        return res.json({
+            answer: response.data.resultImageUrl
+        });
     } catch (error) {
-        res.status(500).json({ 
-            error: "Image upscaling failed",
-            details: error.response?.data || error.message
+        return res.status(500).json({ 
+            error: error.message || 'Internal server error'
         });
     }
 }

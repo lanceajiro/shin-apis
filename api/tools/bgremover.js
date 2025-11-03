@@ -1,17 +1,29 @@
+// Modified bgremover.js
 const axios = require('axios');
 
 const meta = {
     name: "Background Remover",
-    version: "1.0.0",
-    author: "rapido",
+    desc: "Remove background from an image using pxpic.com API",
+    method: [ 'get', 'post' ],
     category: "tools",
-    method: "GET",
-    path: "/remove-background?imageUrl="
+    params: [
+      {
+        name: 'imageUrl',
+        description: 'URL of the image to remove background from',
+        example: 'https://example.com/image.jpg',
+        required: true
+      }
+    ]
 };
 
 async function onStart({ res, req }) {
-    const { imageUrl } = req.query;
-    if (!imageUrl) return res.status(400).json({ error: "imageUrl parameter required" });
+    let imageUrl;
+    if (req.method === 'POST') {
+      ({ imageUrl } = req.body);
+    } else {
+      ({ imageUrl } = req.query);
+    }
+    if (!imageUrl) return res.status(400).json({ error: "Missing required parameter: imageUrl" });
 
     try {
         const response = await axios.post('https://pxpic.com/callAiFunction', {
@@ -41,13 +53,12 @@ async function onStart({ res, req }) {
             }
         });
 
-        res.json({
-            result: response.data.resultImageUrl
+        return res.json({
+            answer: response.data.resultImageUrl
         });
     } catch (error) {
-        res.status(500).json({ 
-            error: "Background removal failed",
-            details: error.response?.data || error.message
+        return res.status(500).json({ 
+            error: error.message || 'Internal server error'
         });
     }
 }

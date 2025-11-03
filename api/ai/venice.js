@@ -1,25 +1,38 @@
+// Modified venice.js
 const axios = require('axios');
-
 const meta = {
   name: 'venice',
   desc: 'send a question to Venice AI',
-  method: 'get',
+  method: [ 'get', 'post' ],
   category: 'AI',
-  guide: {
-    question: 'The question or prompt to send to Venice AI'
-  },
-  params: ['question']
+  params: [
+    {
+      name: 'question',
+      description: 'Input your question here',
+      example: 'What is the capital of Philippines?',
+      required: true
+    }, 
+    { 
+      name: 'systemPrompt',
+      description: 'input your system prompt here',
+      example: 'You are my assistant',
+      required: false
+    }
+  ]
 };
 
 async function onStart({ req, res }) {
-  const { question } = req.query;
-
+  let question, systemPrompt;
+  if (req.method === 'POST') {
+    ({ question, systemPrompt } = req.body);
+  } else {
+    ({ question, systemPrompt } = req.query);
+  }
   if (!question) {
     return res.status(400).json({
       error: 'Missing required parameter: question'
     });
   }
-
   try {
     const { data } = await axios.request({
       method: 'POST',
@@ -45,7 +58,7 @@ async function onStart({ req, res }) {
             role: 'user'
           }
         ],
-        systemPrompt: '',
+        systemPrompt: systemPrompt || '', // Use systemPrompt or default to empty string
         conversationType: 'text',
         temperature: 0.8,
         webEnabled: true,
@@ -55,7 +68,6 @@ async function onStart({ req, res }) {
       }),
       transformResponse: [(data) => data]
     });
-
     const chunks = (typeof data === 'string' ? data : String(data))
       .split('\n')
       .filter((chunk) => chunk.trim())
@@ -67,9 +79,7 @@ async function onStart({ req, res }) {
         }
       })
       .filter(Boolean);
-
     const result = chunks.map((c) => c.content || '').join('');
-
     return res.json({
       answer: result
     });
@@ -79,5 +89,4 @@ async function onStart({ req, res }) {
     });
   }
 }
-
 module.exports = { meta, onStart };

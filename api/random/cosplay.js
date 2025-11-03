@@ -4,7 +4,7 @@ const meta = {
     name: 'cosplay',
     desc: 'get random cosplay video',
     method: 'get',
-    category: 'anime',
+    category: 'random',
     params: []
 };
 

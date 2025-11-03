@@ -1,11 +1,19 @@
+// Modified sp-dl.js
 const axios = require('axios');
 
 const meta = {
   name: 'Spotify Downloader',
-  path: '/sp-dl?url=',
-  method: 'get',
+  desc: "Download Spotify tracks",
+  method: [ 'get', 'post' ],
   category: 'downloader',
-  description: ''
+  params: [
+    {
+      name: 'url',
+      description: 'The Spotify track URL',
+      example: 'https://open.spotify.com/track/11dFghVXANMlKmJXsNCbNl',
+      required: true
+    }
+  ]
 };
 
 const API_URL = 'https://api.fabdl.com/spotify/get?url=';
@@ -70,28 +78,38 @@ async function downloadTrack(url) {
 }
 
 async function onStart({ req, res }) {
-  const { url } = req.query;
+  let url;
+  if (req.method === 'POST') {
+    ({ url } = req.body);
+  } else {
+    ({ url } = req.query);
+  }
 
-  if (!url || !SPOTIFY_REGEX.test(url)) {
+  if (!url) {
     return res.status(400).json({
-      error: 'Valid Spotify track URL required',
-      example: '/sp-dl?url=https://open.spotify.com/track/11dFghVXANMlKmJXsNCbNl'
+      error: 'Missing required parameter: url'
+    });
+  }
+
+  if (!SPOTIFY_REGEX.test(url)) {
+    return res.status(400).json({
+      error: 'Valid Spotify track URL required'
     });
   }
 
   try {
     const trackData = await downloadTrack(url);
-    res.json(trackData ? {
-      status: true,
-      trackData
-    } : {
-      status: false,
-      error: 'No results found'
+    if (!trackData) {
+      return res.status(500).json({
+        error: 'No results found'
+      });
+    }
+    return res.json({
+      answer: trackData
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      error: 'Failed to download track'
+    return res.status(500).json({
+      error: error.message || 'Internal server error'
     });
   }
 }

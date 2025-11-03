@@ -1,14 +1,19 @@
+// Modified oos.js
 const axios = require("axios");
 
 const meta = {
   name: "Oss",
   desc: "Generate a response using GPT OSS 120B via Gradient.chat streaming endpoint",
-  method: "get",
-  category: "AI",
-  guide: {
-    text: "The prompt or message to send to the model",
-  },
-  params: ["text"],
+  method: [ 'get', 'post' ],
+  category: 'AI',
+  params: [
+    {
+      name: 'text',
+      description: 'The prompt or message to send to the model',
+      example: 'Hello, how are you?',
+      required: true
+    }
+  ]
 };
 
 async function gradientChat({ model, clusterMode, messages, enableThinking }) {
@@ -84,12 +89,16 @@ async function gradientChat({ model, clusterMode, messages, enableThinking }) {
 }
 
 async function onStart({ req, res }) {
-  const { text } = req.query;
+  let text;
+  if (req.method === 'POST') {
+    ({ text } = req.body);
+  } else {
+    ({ text } = req.query);
+  }
 
   if (!text) {
     return res.status(400).json({
-      error: "Missing required parameter: text",
-      timestamp: new Date().toISOString(),
+      error: "Missing required parameter: text"
     });
   }
 
@@ -101,14 +110,12 @@ async function onStart({ req, res }) {
       enableThinking: true,
     });
 
-    return res.status(200).json({
-      result,
-      timestamp: new Date().toISOString(),
+    return res.json({
+      answer: result.content
     });
   } catch (err) {
     return res.status(500).json({
-      error: err?.message || "Internal server error",
-      timestamp: new Date().toISOString(),
+      error: err?.message || "Internal server error"
     });
   }
 }

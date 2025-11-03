@@ -1,3 +1,4 @@
+// Modified pastebin.js
 const PastebinAPI = require('pastebin-js');
 const pastebin = new PastebinAPI({
   api_dev_key: 'LFhKGk5aRuRBII5zKZbbEpQjZzboWDp9',
@@ -6,8 +7,17 @@ const pastebin = new PastebinAPI({
 
 const meta = {
   name: 'pastebin',
-  path: '/pastebin?c=',
-  category: 'tools'
+  desc: 'Create a paste on Pastebin and return the raw URL',
+  method: [ 'get', 'post' ],
+  category: 'tools',
+  params: [
+    {
+      name: 'text',
+      description: 'The text content to paste',
+      example: 'Hello, world!',
+      required: true
+    }
+  ]
 };
 
 function generateRandomString(length) {
@@ -20,23 +30,32 @@ function generateRandomString(length) {
 }
 
 async function onStart({ req, res }) {
-  const { c } = req.query;
-  
-  if (!c) {
-    return res.status(400).json({ error: 'Parameter "c" is required' });
+  let text;
+  if (req.method === 'POST') {
+    ({ text } = req.body);
+  } else {
+    ({ text } = req.query);
   }
-  
+
+  if (!text) {
+    return res.status(400).json({ error: 'Missing required parameter: text' });
+  }
+
   try {
     const paste = await pastebin.createPaste({
-      text: c,
+      text: text,
       title: generateRandomString(10),
       format: null,
       privacy: 1
     });
     const raw = paste.replace("pastebin.com", "pastebin.com/raw");
-    res.json({ url: raw });
+    return res.json({ 
+      answer: raw 
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ 
+      error: error.message || 'Internal server error' 
+    });
   }
 }
 

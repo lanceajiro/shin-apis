@@ -1,20 +1,34 @@
+// Modified chatgptfree.js
 const axios = require('axios');
-
 const meta = {
   name: 'ChatGPT Free',
   desc: 'send a prompt to a selectable ChatGPT models',
-  method: 'get',
+  method: [ 'get', 'post' ],
   category: 'AI',
-  guide: {
-    prompt: 'The text prompt to send to the model',
-    model: "Optional model key: 'chatgpt4' (default) or 'chatgpt3'"
-  },
-  params: ['prompt', 'model']
+  params: [
+    {
+      name: 'prompt',
+      description: 'The text prompt to send to the model',
+      example: 'Hello, how are you?',
+      required: true
+    }, 
+    { 
+      name: 'model',
+      description: "Optional model key: 'chatgpt4' (default) or 'chatgpt3'",
+      example: 'chatgpt4',
+      required: false
+    }
+  ]
 };
 
 async function onStart({ req, res }) {
-  const { prompt, model = 'chatgpt4' } = req.query;
-
+  let prompt, model;
+  if (req.method === 'POST') {
+    ({ prompt, model } = req.body);
+  } else {
+    ({ prompt, model } = req.query);
+  }
+  model = model || 'chatgpt4';
   const model_list = {
     chatgpt4: {
       api: 'https://stablediffusion.fr/gpt4/predict2',
@@ -58,10 +72,11 @@ async function onStart({ req, res }) {
       }
     );
 
-    return res.json({ message: data.message });
+    return res.json({
+      answer: data.message
+    });
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }
-
 module.exports = { meta, onStart };

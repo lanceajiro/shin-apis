@@ -1,3 +1,4 @@
+<!-- Modified category.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -103,6 +104,13 @@
         }
         .transition-all {
             transition: all 0.3s ease;
+        }
+        .tab-indicator {
+            position: absolute;
+            bottom: 0;
+            height: 2px;
+            background-color: #9333ea;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
     </style>
 </head>
@@ -244,6 +252,7 @@
                 content.classList.remove('hidden');
                 content.classList.add('slide-down');
                 icon.style.transform = 'rotate(180deg)';
+                setTimeout(() => initializeIndicator(endpointIndex), 50);
             } else {
                 content.classList.add('slide-up');
                 icon.style.transform = 'rotate(0deg)';
@@ -252,6 +261,101 @@
                     content.classList.remove('slide-up', 'slide-down');
                 }, 150);
             }
+        }
+
+        function initializeIndicator(endpointIndex) {
+            const getTab = document.getElementById(`tab-get-${endpointIndex}`);
+            if (getTab) {
+                const indicator = document.getElementById(`tab-indicator-${endpointIndex}`);
+                indicator.style.left = getTab.offsetLeft + 'px';
+                indicator.style.width = getTab.offsetWidth + 'px';
+            }
+        }
+
+        function generateExampleCurl(endpointIndex, method) {
+            const form = document.getElementById(`form-${endpointIndex}`);
+            const onsubmit = form.getAttribute('onsubmit');
+            const pathMatch = onsubmit.match(/, '([^']+)', '[^']+'\)$/);
+            const path = pathMatch ? pathMatch[1] : '';
+            let fullUrl = window.location.origin + path;
+            let curl = `curl -X ${method} "${fullUrl}"`;
+            const currentDivClass = `.method-${method.toLowerCase()}-${endpointIndex}`;
+            const currentDiv = form.querySelector(currentDivClass);
+            if (!currentDiv) return;
+            const inputs = currentDiv.querySelectorAll('input[type="text"]');
+            let routeValues = {};
+            let otherParams = {};
+            inputs.forEach(input => {
+                const ex = input.placeholder || '';
+                if (input.name.startsWith('route_')) {
+                    const pn = input.name.replace('route_', '');
+                    routeValues[pn] = ex;
+                } else {
+                    otherParams[input.name] = ex;
+                }
+            });
+            for (const [pn, val] of Object.entries(routeValues)) {
+                fullUrl = fullUrl.replace(`:${pn}`, encodeURIComponent(val));
+            }
+            curl = `curl -X ${method} "${fullUrl}"`;
+            if (method === 'GET' || method === 'HEAD') {
+                const qp = new URLSearchParams(otherParams);
+                if (qp.toString()) {
+                    fullUrl += '?' + qp.toString();
+                    curl = `curl -X ${method} "${fullUrl}"`;
+                }
+            } else {
+                let jsonBody = otherParams;
+                const textarea = currentDiv.querySelector('textarea[name="body"]');
+                if (textarea) {
+                    try {
+                        jsonBody = JSON.parse(textarea.value);
+                    } catch (e) {
+                        jsonBody = {};
+                    }
+                }
+                if (Object.keys(jsonBody).length > 0) {
+                    curl = `curl -X ${method} "${fullUrl}" \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(jsonBody, null, 2)}'`;
+                }
+            }
+            const curlContent = document.getElementById(`curl-content-${endpointIndex}`);
+            curlContent.textContent = curl;
+        }
+
+        function switchMethod(endpointIndex, method) {
+            const tabs = ['GET', 'POST']; // Assuming GET and POST
+            tabs.forEach(m => {
+                const tab = document.getElementById(`tab-${m.toLowerCase()}-${endpointIndex}`);
+                if (tab) {
+                    if (m === method) {
+                        tab.classList.add('text-gray-100');
+                        tab.classList.remove('text-gray-500');
+                        const indicator = document.getElementById(`tab-indicator-${endpointIndex}`);
+                        if (indicator) {
+                            indicator.style.left = tab.offsetLeft + 'px';
+                            indicator.style.width = tab.offsetWidth + 'px';
+                        }
+                    } else {
+                        tab.classList.remove('text-gray-100');
+                        tab.classList.add('text-gray-500');
+                    }
+                }
+            });
+
+            tabs.forEach(m => {
+                const contents = document.querySelectorAll(`.method-${m.toLowerCase()}-${endpointIndex}`);
+                contents.forEach(el => {
+                    el.style.display = m === method ? 'block' : 'none';
+                    el.querySelectorAll('input, textarea, select').forEach(inp => inp.disabled = m !== method);
+                });
+            });
+
+            const form = document.getElementById(`form-${endpointIndex}`);
+            let onsubmit = form.getAttribute('onsubmit');
+            onsubmit = onsubmit.replace(/executeRequest\(event, \d+, '[A-Z]+'/, `executeRequest(event, ${endpointIndex}, '${method}'`);
+            form.setAttribute('onsubmit', onsubmit);
+
+            generateExampleCurl(endpointIndex, method);
         }
 
         function clearResponse(endpointIndex) {
@@ -633,59 +737,62 @@
                 const apiList = document.getElementById('apiList');
                 apiList.innerHTML = '';
                 let index = 0;
-                for (const it of category.items) {
-                    const key = Object.keys(it)[0];
-                    const { desc, path, method = 'GET', guide = {} } = it[key];
-                    const alias = key.replace(/-/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                    const [basePath, queryStr] = path.split('?');
-                    const params = queryStr ? queryStr.split('&').map(p => p.replace('=', '')) : [];
+                for (const item of category.items) {
+                    const alias = item.name.replace(/-/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    const basePath = item.path.split('?')[0];
+                    const methods = item.methods;
+                    const methodStr = methods.join('/');
+                    let tabsHtml = '';
+                    if (methods.length > 1) {
+                        tabsHtml = `<div class="tab-container border-b border-gray-700 mb-4"><div class="flex relative">`;
+                        methods.forEach((m, idx) => {
+                            tabsHtml += `
+                                <button 
+                                    type="button"
+                                    onclick="switchMethod(${index}, '${m}')"
+                                    id="tab-${m.toLowerCase()}-${index}"
+                                    class="px-4 py-2 text-xs font-semibold ${idx === 0 ? 'text-gray-100' : 'text-gray-500 hover:text-gray-100'} transition-colors"
+                                >
+                                    ${m}
+                                </button>
+                            `;
+                        });
+                        tabsHtml += `<div class="tab-indicator" id="tab-indicator-${index}"></div></div></div>`;
+                    }
                     let formHtml = '';
-                    if (params.length) {
-                        formHtml = params.map((param, paramIndex) => `
+                    if (item.params && item.params.length) {
+                        formHtml = item.params.map(p => `
                             <div>
                                 <label class="block text-xs font-medium text-gray-300">
-                                    ${param} 
-                                    ${paramIndex === 0 ? '<span class="text-red-400">*</span>' : ''}
+                                    ${p.name} ${p.required ? '<span class="text-red-400">*</span>' : ''}
                                 </label>
                                 <div class="text-xs text-gray-500 mb-1">
-                                    ${guide[param] || `Input ${param}.`}
+                                    ${p.description}
                                 </div>
                                 <input 
                                     type="text" 
-                                    name="${param}" 
+                                    name="${basePath.includes(`:${p.name}`) ? `route_${p.name}` : p.name}" 
                                     class="w-full px-3 py-2 border border-gray-700 bg-black text-sm focus:outline-none focus:border-purple-500 text-gray-100 placeholder:text-gray-500 rounded-lg transition-all focus:shadow-sm" 
-                                    placeholder="" 
-                                    ${paramIndex === 0 ? 'required' : ''}
+                                    placeholder="${p.example || ''}" 
+                                    ${p.required ? 'required' : ''}
                                 >
                             </div>
                         `).join('');
                     }
-                    let methodBg = 'bg-black';
-                    let methodText = 'text-purple-400';
-                    if (method === 'GET') {
-                        methodBg = 'bg-gradient-to-r from-purple-600 to-purple-400';
-                        methodText = 'text-white';
-                    } else if (method === 'POST') {
-                        methodBg = 'bg-green-600';
-                        methodText = 'text-white';
-                    } else if (method === 'PUT') {
-                        methodBg = 'bg-yellow-600';
-                        methodText = 'text-white';
-                    } else if (method === 'DELETE') {
-                        methodBg = 'bg-red-600';
-                        methodText = 'text-white';
-                    }
+                    const bodyExample = item.params ? JSON.stringify(item.params.reduce((acc, p) => { if (!basePath.includes(`:${p.name}`)) acc[p.name] = p.example || ''; return acc; }, {}), null, 2) : '{}';
+                    let getStyle = methods.length > 1 ? '' : (methods[0] === 'GET' ? 'display: block;' : 'display: none;');
+                    let postStyle = methods.length > 1 ? 'display: none;' : (methods[0] === 'POST' ? 'display: block;' : 'display: none;');
                     const div = document.createElement('div');
                     div.classList.add('bg-black', 'border', 'border-gray-700', 'api-item', 'hover:border-purple-500', 'rounded-lg', 'overflow-hidden', 'shadow-md', 'transition-all', 'hover:shadow-xl');
-                    div.dataset.method = method;
+                    div.dataset.method = methodStr;
                     div.dataset.path = basePath;
                     div.dataset.alias = alias;
                     div.innerHTML = `
                         <button onclick="toggleEndpoint(${index})" class="w-full text-left">
                             <div class="px-4 py-3.5 flex items-center justify-between gap-3 bg-black">
                                 <div class="flex items-center min-w-0 flex-1 gap-3">
-                                    <span class="inline-block px-2.5 py-1 text-xs font-semibold ${methodText} flex-shrink-0 rounded ${methodBg} transition-all hover:opacity-90">
-                                        ${method}
+                                    <span class="inline-block px-2.5 py-1 text-xs font-semibold text-white flex-shrink-0 rounded bg-gradient-to-r from-purple-600 to-purple-400 transition-all hover:opacity-90">
+                                        ${methodStr}
                                     </span>
                                     <span class="font-semibold truncate font-mono text-sm text-gray-100" title="${basePath}">${basePath}</span>
                                 </div>
@@ -704,7 +811,7 @@
                                     <span class="material-icons text-sm mr-1">info</span>
                                     DESCRIPTION
                                 </div>
-                                <p class="text-xs text-gray-400 mb-4">${desc}</p>
+                                <p class="text-xs text-gray-400 mb-4">${item.desc}</p>
                             </div>
                             <div>
                                 <div class="text-gray-300 font-bold text-xs mb-2 flex items-center">
@@ -712,15 +819,26 @@
                                     TRY IT OUT
                                 </div>
                                 <div>
-                                    <form id="form-${index}" onsubmit="executeRequest(event, ${index}, '${method}', '${basePath}', 'application/json')">
-                                        <div class="mb-4 space-y-2">
+                                    <form id="form-${index}" onsubmit="executeRequest(event, ${index}, '${methods[0]}', '${basePath}', 'application/json')">
+                                        ${tabsHtml}
+                                        <div class="mb-4 space-y-2 method-content method-get-${index}" style="${getStyle}">
                                             ${formHtml}
                                         </div>
+                                        <div class="mb-3 method-content method-post-${index}" style="${postStyle}">
+                                            <textarea 
+                                                name="body" 
+                                                rows="8" 
+                                                class="w-full px-3 py-2 border border-gray-700 bg-black text-sm focus:outline-none focus:border-purple-500 text-gray-100 placeholder:text-gray-500 font-mono rounded-lg transition-all focus:shadow-sm resize-none" 
+                                                placeholder="Enter JSON body here...">${bodyExample}</textarea>
+                                            <div class="text-xs text-gray-500 mt-1">
+                                                Modify the JSON structure above as needed for your request.
+                                            </div>
+                                        </div>
                                         <button type="submit" class="bg-gradient-to-r from-purple-600 to-purple-400 hover:opacity-90 font-semibold text-gray-100 px-6 py-2 text-xs font-medium transition-colors duration-150 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg">
-                                        Execute
+                                            Execute
                                         </button>
                                         <button type="button" id="clear-${index}" onclick="clearResponse(${index})" class="hidden bg-black border border-gray-700 hover:border-purple-500 font-semibold text-gray-100 px-6 py-2 text-xs font-medium transition-colors duration-150 ml-2 rounded-lg">
-                                        Clear
+                                            Clear
                                         </button>
                                     </form>
                                 </div>
@@ -739,7 +857,7 @@
                                     <div class="bg-black max-h-80 overflow-auto" id="response-content-${index}"></div>
                                 </div>
                             </div>
-                            <div id="curl-${index}" class="hidden mt-4">
+                            <div id="curl-${index}" class="mt-4">
                                 <div class="text-gray-300 font-bold text-xs mb-3 flex items-center justify-between">
                                     <div class="flex items-center">
                                         <span class="material-icons text-sm mr-1">terminal</span>
@@ -832,6 +950,7 @@
                         </div>
                     `;
                     apiList.appendChild(div);
+                    generateExampleCurl(index, methods[0]);
                     index++;
                 }
 

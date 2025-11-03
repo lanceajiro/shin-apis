@@ -2,12 +2,11 @@ const axios = require('axios');
 
 const meta = {
   name: "Gen V2",
-  version: "1.0.0",
-  description: "Generate temporary email accounts",
+  desc: "Generate temporary email accounts",
   author: "rapido (jm)",
   method: "get",
   category: "tempmail",
-  path: "/tempmail/genv2"
+  params: []
 };
 
 async function onStart({ res }) {

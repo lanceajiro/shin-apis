@@ -1,3 +1,4 @@
+// Modified fbdlv2.js
 const axios = require("axios");
 const cheerio = require("cheerio");
 const qs = require("qs");
@@ -5,12 +6,16 @@ const qs = require("qs");
 const meta = {
   name: "Facebook Downloader V2",
   desc: "Extract downloadable links and metadata from a Facebook video URL using saveas.co",
-  method: "get",
+  method: [ 'get', 'post' ],
   category: "downloader",
-  guide: {
-    url: "Direct Facebook video URL to extract download links from",
-  },
-  params: ["url"],
+  params: [
+    {
+      name: 'url',
+      description: 'Direct Facebook video URL to extract download links from',
+      example: 'https://www.facebook.com/watch?v=123456789',
+      required: true
+    }
+  ]
 };
 
 async function asu(url) {
@@ -46,12 +51,16 @@ async function asu(url) {
 }
 
 async function onStart({ req, res }) {
-  const { url } = req.query;
+  let url;
+  if (req.method === 'POST') {
+    ({ url } = req.body);
+  } else {
+    ({ url } = req.query);
+  }
 
   if (!url) {
     return res.status(400).json({
-      error: "Missing required parameter: url",
-      timestamp: new Date().toISOString(),
+      error: "Missing required parameter: url"
     });
   }
 
@@ -60,19 +69,16 @@ async function onStart({ req, res }) {
 
     if (result?.status === "error") {
       return res.status(500).json({
-        error: result.message || "Failed to extract data",
-        timestamp: new Date().toISOString(),
+        error: result.message || "Failed to extract data"
       });
     }
 
-    return res.status(200).json({
-      result,
-      timestamp: new Date().toISOString(),
+    return res.json({
+      answer: result
     });
   } catch (err) {
     return res.status(500).json({
-      error: err?.message || "Internal server error",
-      timestamp: new Date().toISOString(),
+      error: err?.message || "Internal server error"
     });
   }
 }

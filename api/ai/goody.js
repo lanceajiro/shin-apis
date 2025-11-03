@@ -1,13 +1,19 @@
+// Modified goody.js
 const axios = require('axios');
 
 const meta = {
-    name: "goody",
-    version: "1.0.0",
-    author: "rapido",
-    description: "Generate responses using GoodyAI",
-    method: "get",
-    category: "AI",
-    path: "/goody?q="
+  name: "goody",
+  desc: "Generate responses using GoodyAI",
+  method: [ 'get', 'post' ],
+  category: 'AI',
+  params: [
+    {
+      name: 'question',
+      description: 'The prompt or query to send to GoodyAI',
+      example: 'Hello, how are you?',
+      required: true
+    }
+  ]
 };
 
 const font = {
@@ -28,7 +34,7 @@ const font = {
 function parseSSEResponse(sseData) {
     let fullMessage = "";
     const lines = sseData.split('\n\n');
-    
+
     for (const line of lines) {
         if (line.startsWith('event: message')) {
             const dataMatch = line.match(/data: (.*)/);
@@ -48,39 +54,44 @@ function parseSSEResponse(sseData) {
 }
 
 async function onStart({ res, req }) {
-    const query = req.query.q;
-    if (!query) {
-        return res.json({ error: "No prompt provided" });
-    }
+  let question;
+  if (req.method === 'POST') {
+    ({ question } = req.body);
+  } else {
+    ({ question } = req.query);
+  }
+  if (!question) {
+    return res.status(400).json({
+      error: 'Missing required parameter: question'
+    });
+  }
 
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Mobile Safari/537.36',
-        'Content-Type': 'text/plain',
-        'Accept': '*/*',
-        'Origin': 'https://www.goody2.ai',
-        'Referer': 'https://www.goody2.ai/chat'
-    };
+  const headers = {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Mobile Safari/537.36',
+      'Content-Type': 'text/plain',
+      'Accept': '*/*',
+      'Origin': 'https://www.goody2.ai',
+      'Referer': 'https://www.goody2.ai/chat'
+  };
 
-    try {
-        const response = await axios.post("https://www.goody2.ai/send", 
-            JSON.stringify({ "message": query, "debugParams": null }), 
-            { headers, responseType: 'text' }
-        );
+  try {
+      const response = await axios.post("https://www.goody2.ai/send", 
+          JSON.stringify({ "message": question, "debugParams": null }), 
+          { headers, responseType: 'text' }
+      );
 
-        const fullText = parseSSEResponse(response.data);
-        const formattedText = fullText.replace(/\*\*(.*?)\*\*/g, (_, text) => font.bold(text));
-        
-        return res.json({
-            response: formattedText,
-            author: meta.author
-        });
+      const fullText = parseSSEResponse(response.data);
+      const formattedText = fullText.replace(/\*\*(.*?)\*\*/g, (_, text) => font.bold(text));
 
-    } catch (error) {
-        return res.json({ 
-            error: "Service unavailable",
-            details: error.message
-        });
-    }
+      return res.json({
+          answer: formattedText
+      });
+
+  } catch (error) {
+      return res.status(500).json({ 
+          error: error.message || 'Internal server error'
+      });
+  }
 }
 
 module.exports = { meta, onStart };

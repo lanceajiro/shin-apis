@@ -1,20 +1,35 @@
+// Modified inboxV2.js
 const axios = require('axios');
 
 const meta = {
   name: "Inbox V2",
-  version: "1.0.0",
-  description: "Check temporary email inbox",
-  author: "rapido (jm)",
-  method: "get",
-  category: "tempmail",
-  path: "/tempmail/inboxv2?token="
+  desc: "Check temporary email inbox",
+  method: [ 'get', 'post' ],
+  category: 'tempmail',
+  params: [
+    {
+      name: 'token',
+      description: 'The authentication token',
+      example: 'your_token_here',
+      required: true
+    }
+  ]
 };
 
-async function onStart({ res, req }) {
+async function onStart({ req, res }) {
+  let token;
+  if (req.method === 'POST') {
+    ({ token } = req.body);
+  } else {
+    ({ token } = req.query);
+  }
+  if (!token) {
+    return res.status(400).json({
+      error: "Missing required parameter: token"
+    });
+  }
+
   try {
-    const token = req.query.token;
-    if (!token) return res.json({ error: "Token is required" });
-    
     const messages = await getMessages(token);
     const formattedMessages = messages.map(message => ({
       id: message.id,
@@ -24,10 +39,14 @@ async function onStart({ res, req }) {
       date: message.createdAt,
       read: message.seen
     }));
-    
-    return res.json(formattedMessages);
+
+    return res.json({
+      answer: formattedMessages
+    });
   } catch (error) {
-    return res.json({ error: error.message });
+    return res.status(500).json({
+      error: error.message || 'Internal server error'
+    });
   }
 }
 

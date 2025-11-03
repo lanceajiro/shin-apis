@@ -1,10 +1,19 @@
+// Modified webpilot.js
 const axios = require("axios");
 
 const meta = {
   name: 'WebPilot',
-  path: '/webpilot?q=',
-  method: 'get',
-  category: 'AI'
+  desc: 'Generate responses using WebPilot AI',
+  method: [ 'get', 'post' ],
+  category: 'AI',
+  params: [
+    {
+      name: 'question',
+      description: 'The prompt or query to send to WebPilot',
+      example: 'Hello, how are you?',
+      required: true
+    }
+  ]
 };
 
 class WebPilotAPI {
@@ -43,15 +52,28 @@ class WebPilotAPI {
 }
 
 async function onStart({ req, res }) {
-  try {
-    const prompt = req.query.q;
-    if (!prompt) return res.status(400).json({ error: "Missing query parameter 'q'" });
+  let question;
+  if (req.method === 'POST') {
+    ({ question } = req.body);
+  } else {
+    ({ question } = req.query);
+  }
+  if (!question) {
+    return res.status(400).json({
+      error: "Missing required parameter: question"
+    });
+  }
 
+  try {
     const wp = new WebPilotAPI();
-    const result = await wp.fetchData(prompt);
-    res.json({ result });
+    const result = await wp.fetchData(question);
+    return res.json({ 
+      answer: result 
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ 
+      error: err.message || 'Internal server error' 
+    });
   }
 }
 

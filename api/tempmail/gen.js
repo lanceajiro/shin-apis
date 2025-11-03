@@ -5,8 +5,8 @@ const meta = {
     version: "1.0.0",
     author: "jm",
     category: "tempmail",
-    method: "GET",
-    path: "/tempmail/gen"
+    method: "get",
+    params: []
 };
 
 async function onStart({ res, req }) {

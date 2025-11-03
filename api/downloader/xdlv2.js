@@ -1,15 +1,20 @@
+// Modified xdlv2.js
 const axios = require("axios");
 const crypto = require("crypto");
 
 const meta = {
   name: "X Downloader V2",
   desc: "Download/extract media from an X (Twitter) URL using the densavedownloader API",
-  method: "get",
+  method: [ 'get', 'post' ],
   category: "downloader",
-  guide: {
-    url: "Direct X/Twitter post URL to extract media from",
-  },
-  params: ["url"],
+  params: [
+    {
+      name: 'url',
+      description: 'Direct X/Twitter post URL to extract media from',
+      example: 'https://x.com/user/status/123456789',
+      required: true
+    }
+  ]
 };
 
 class Util {
@@ -159,26 +164,28 @@ async function fetchUrlData(targetUrl, options = {}) {
 }
 
 async function onStart({ req, res }) {
-  const { url } = req.query;
+  let url;
+  if (req.method === 'POST') {
+    ({ url } = req.body);
+  } else {
+    ({ url } = req.query);
+  }
 
   if (!url) {
     return res.status(400).json({
-      error: "Missing required parameter: url",
-      timestamp: new Date().toISOString(),
+      error: "Missing required parameter: url"
     });
   }
 
   try {
     const result = await fetchUrlData(url);
 
-    return res.status(200).json({
-      result,
-      timestamp: new Date().toISOString(),
+    return res.json({
+      answer: result
     });
   } catch (err) {
     return res.status(500).json({
-      error: err?.message || "Internal server error",
-      timestamp: new Date().toISOString(),
+      error: err?.message || "Internal server error"
     });
   }
 }

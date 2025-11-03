@@ -1,3 +1,4 @@
+// Modified unblur.js
 const axios = require("axios");
 const FormData = require("form-data");
 const crypto = require("crypto");
@@ -5,12 +6,16 @@ const crypto = require("crypto");
 const meta = {
   name: "unblur",
   desc: "Remove blur / upscale an image from a remote URL using unblurimage.ai",
-  method: "get",
+  method: [ 'get', 'post' ],
   category: "tools",
-  guide: {
-    url: "Direct URL to the image to unblur",
-  },
-  params: ["url"],
+  params: [
+    {
+      name: 'url',
+      description: 'Direct URL to the image to unblur',
+      example: 'https://example.com/blurry-image.jpg',
+      required: true
+    }
+  ]
 };
 
 async function unblurFromUrl(imageUrl) {
@@ -62,12 +67,16 @@ async function unblurFromUrl(imageUrl) {
 }
 
 async function onStart({ req, res }) {
-  const { url } = req.query;
+  let url;
+  if (req.method === 'POST') {
+    ({ url } = req.body);
+  } else {
+    ({ url } = req.query);
+  }
 
   if (!url) {
     return res.status(400).json({
-      error: "Missing required parameter: url",
-      timestamp: new Date().toISOString(),
+      error: "Missing required parameter: url"
     });
   }
 
@@ -76,19 +85,16 @@ async function onStart({ req, res }) {
 
     if (result?.error) {
       return res.status(500).json({
-        error: result.error,
-        timestamp: new Date().toISOString(),
+        error: result.error
       });
     }
 
-    return res.status(200).json({
-      result,
-      timestamp: new Date().toISOString(),
+    return res.json({
+      answer: result.output
     });
   } catch (err) {
     return res.status(500).json({
-      error: err?.message || "Internal server error",
-      timestamp: new Date().toISOString(),
+      error: err?.message || "Internal server error"
     });
   }
 }
