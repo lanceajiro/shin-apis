@@ -26,13 +26,15 @@ const chalk = require('chalk');
 
   logger.info('Starting server initialization...');
 
+  // Middleware to automatically attach creator info to all JSON responses
   app.use((req, res, next) => {
     const originalJson = res.json;
     res.json = function (data) {
       if (data && typeof data === 'object') {
         const responseData = {
           status: data.status,
-          creator: (set.author || '').toLowerCase(),
+          // Preserve original case of creator from settings.js
+          creator: set.author || '',
           ...data,
         };
         return originalJson.call(this, responseData);
@@ -94,7 +96,9 @@ const chalk = require('chalk');
               endpoints.push(bucket);
             }
 
-            const methods = Array.isArray(mod.meta.method) ? mod.meta.method.map(m => m.toUpperCase()) : [mod.meta.method?.toUpperCase() || 'GET'];
+            const methods = Array.isArray(mod.meta.method)
+              ? mod.meta.method.map(m => m.toUpperCase())
+              : [mod.meta.method?.toUpperCase() || 'GET'];
 
             bucket.items.push({
               ...mod.meta,
