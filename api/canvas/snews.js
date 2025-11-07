@@ -1,22 +1,15 @@
 // snews.js
-const { Canvas, createCanvas, loadImage: loadImageOrig, Path2D } = require('@napi-rs/canvas');
+const { Canvas, createCanvas, loadImage: loadImageOrig, SKRSContext2D, Path2D, CanvasGradient, CanvasTextAlign, CanvasTextBaseline } = require('@napi-rs/canvas');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function isValidURL(str) {
-  try {
-    new URL(str);
-    return true;
-  } catch {
-    return false;
-  }
-}
+let setupDone = false;
 
 class CanvCass {
-  static async loadImage(source) {
-    return await loadImageOrig(source);
+
+  static async singleSetup() {
+    // Removed font registration
   }
 
   static createRect(basis) {
@@ -26,8 +19,8 @@ class CanvCass {
       throw new Error("createRect: width and height must be provided as numbers.");
     }
 
-    const x = basis.centerX;
-    const y = basis.centerY;
+    const x = basis.centerX ?? basis.centerX;
+    const y = basis.centerY ?? basis.centerY;
 
     const left = basis.left ?? (typeof x === "number" ? x - width / 2 : typeof basis.right === "number" ? basis.right - width : undefined);
 
@@ -64,14 +57,44 @@ class CanvCass {
   static colorA = "#9700af";
   static colorB = "#a69a00";
 
-  constructor(config) {
-    if (!("width" in config && "height" in config)) {
-      throw new TypeError("Invalid Config: width and height required");
+  static async loadImage(source, options) {
+    const tries = 5;
+    let i = 0;
+    while (i <= tries) {
+      i++;
+      try {
+        return await loadImageOrig(source, options);
+      } catch (error) {
+        await delay(500);
+        continue;
+      }
     }
+  }
+
+  constructor(...args) {
+    let config;
+    if (typeof args[0] === "number" && typeof args[1] === "number") {
+      config = {
+        width: args[0],
+        height: args[1],
+      };
+    } else if (args[0] && "width" in args[0] && "height" in args[0]) {
+      config = args[0];
+    } else {
+      throw new TypeError("Invalid First Parameter (Config)");
+    }
+
+    config.background ??= null;
 
     this._config = config;
     this._canvas = createCanvas(config.width, config.height);
     this._context = this._canvas.getContext("2d");
+    this._context.imageSmoothingEnabled = true; // Enable anti-aliasing for higher quality
+    this._context.imageSmoothingQuality = 'high'; // Set high quality smoothing
+  }
+
+  get config() {
+    return this._config;
   }
 
   get width() {
@@ -106,27 +129,65 @@ class CanvCass {
     return this.height / 2;
   }
 
+  async drawBackground() {
+    if (this._config.background !== null) {
+      this.drawBox({
+        left: this.left,
+        top: this.top,
+        width: this.width,
+        height: this.height,
+        fill: this._config.background,
+      });
+    } else {
+      const bg = await CanvCass.loadImage(path.join(process.cwd(), "public", "canvcassbg.png"));
+      if (bg) {
+        this._context.drawImage(bg, this.left, this.top, this.width, this.height);
+      }
+    }
+  }
+
   toPng() {
     return this._canvas.toBuffer("image/png");
   }
 
-  drawBox(config) {
+  drawBox(...args) {
     let rect;
     let style = {};
 
-    if ("rect" in config) {
-      rect = config.rect;
-      style = config;
-      delete style.rect;
+    if (typeof args[0] === "number" && typeof args[1] === "number" && typeof args[2] === "number" && typeof args[3] === "number") {
+      rect = CanvCass.createRect({
+        left: args[0],
+        top: args[1],
+        width: args[2],
+        height: args[3],
+      });
+      style = args[4] ?? {};
+    } else if (typeof args[0] !== "number" && "rect" in args[0]) {
+      rect = args[0].rect;
+      style = args[0];
+      if ("rect" in style) {
+        delete style.rect;
+      }
+    } else if (typeof args[0] !== "number") {
+      const inline = args[0];
+      rect = CanvCass.createRect({
+        ...inline,
+      });
+      style = inline;
     } else {
-      rect = CanvCass.createRect(config);
-      style = config;
+      throw new TypeError("Invalid Arguments, please check the method overloads.");
     }
 
     const ctx = this._context;
     ctx.save();
     ctx.beginPath();
     let path = CanvCass.rectToPath(rect);
+
+    if (style.stroke) {
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = Number(style.strokeWidth ?? "1");
+      ctx.stroke(path);
+    }
 
     if (style.fill) {
       ctx.fillStyle = style.fill;
@@ -136,12 +197,26 @@ class CanvCass {
     ctx.restore();
   }
 
-  drawCircle(config) {
-    const [centerX, centerY] = config.center;
-    const radius = config.radius;
-    const { fill, stroke, strokeWidth } = config;
+  drawCircle(arg1, arg2, arg3) {
+    let centerX;
+    let centerY;
+    let radius;
+    let style = {};
+
+    if (Array.isArray(arg1) && typeof arg2 === "number") {
+      centerX = arg1[0];
+      centerY = arg1[1];
+      radius = arg2;
+      style = arg3 ?? {};
+    } else {
+      const config = arg1;
+      [centerX, centerY] = config.center;
+      radius = config.radius;
+      style = config;
+    }
 
     const ctx = this._context;
+    const { fill, stroke, strokeWidth } = style;
 
     ctx.save();
     ctx.beginPath();
@@ -161,14 +236,34 @@ class CanvCass {
     ctx.restore();
   }
 
-  drawText(config) {
+  drawText(arg1, arg2, arg3, arg4) {
     const ctx = this._context;
 
-    const text = config.text;
-    const x = config.x ?? 0;
-    const y = config.y ?? 0;
+    let text;
+    let x;
+    let y;
+    let options = {};
 
-    this._processFont(config);
+    if (typeof arg1 === "string" && typeof arg2 === "number" && typeof arg3 === "number") {
+      text = arg1;
+      x = arg2;
+      y = arg3;
+      options = arg4 ?? {};
+    } else if (typeof arg1 === "string" && typeof arg2 === "object") {
+      text = arg1;
+      const opt = arg2;
+      x = opt.x ?? 0;
+      y = opt.y ?? 0;
+      options = opt;
+    } else {
+      const config = arg1;
+      text = config.text;
+      x = config.x;
+      y = config.y;
+      options = config;
+    }
+
+    this._processFont(options);
 
     const {
       fill = "white",
@@ -182,20 +277,24 @@ class CanvCass {
       yMargin = 0,
       breakTo = "bottom",
       breakMaxWidth = Infinity,
-    } = config;
+      letterSpacing,
+    } = options;
     const origY = y;
 
-    let modY = y;
-
     if (vAlign === "top") {
-      modY -= size / 2;
-    } else if (vAlign === "bottom") {
-      modY += size / 2;
+      y -= size / 2;
+    }
+
+    if (vAlign === "bottom") {
+      y += size / 2;
     }
 
     ctx.save();
+    if (typeof letterSpacing === "number") {
+      ctx.letterSpacing = `${letterSpacing}px`;
+    }
 
-    const lineHeight = size + yMargin;
+    const lineHeight = size + (yMargin ?? 0);
     const direction = breakTo === "top" ? -1 : 1;
 
     ctx.font = font;
@@ -203,13 +302,16 @@ class CanvCass {
     ctx.textBaseline = baseline;
 
     let { lines, maxWidth } = this.splitBreakDetailed(
-      config,
+      {
+        ...options,
+        text,
+      },
       breakMaxWidth
     );
     lines = lines.filter(Boolean);
 
     let tx = x;
-    let ty = modY;
+    let ty = y;
 
     if (breakTo === "top") {
       lines.reverse();
@@ -234,11 +336,13 @@ class CanvCass {
       ty += lineHeight * direction;
     }
 
-    modY = y;
+    let modY = y;
 
     if (vAlign === "top") {
       modY += size;
-    } else if (vAlign === "bottom") {
+    }
+
+    if (vAlign === "bottom") {
       modY -= size;
     }
 
@@ -248,14 +352,16 @@ class CanvCass {
       ...(breakTo === "bottom" ? { top: origY } : {}),
       ...(breakTo === "top" ? { bottom: origY } : {}),
       ...(breakTo === "center" ? { centerY: origY } : {}),
-      ...(align === "left" || align === "start" ? { left: x } : {}),
-      ...(align === "right" || align === "end" ? { right: x } : {}),
+      ...(align === "left" ? { left: x } : {}),
+      ...(align === "right" ? { right: x } : {}),
       ...(align === "center" ? { centerX: x } : {}),
+      ...(align === "start" ? { left: x } : {}),
+      ...(align === "end" ? { right: x } : {}),
     });
 
     ctx.restore();
 
-    return {
+    const result = {
       lines,
       rect,
       text,
@@ -275,8 +381,10 @@ class CanvCass {
       breakMaxWidth,
       x,
       y: origY,
-      fontType: config.fontType,
+      newY: y,
+      fontType: options.fontType,
     };
+    return result;
   }
 
   createDim(rect, options = {}) {
@@ -298,9 +406,11 @@ class CanvCass {
       options.size ??= 50;
       if (options.fontType === "cbold") {
         options.cssFont = `bold ${options.size}px sans-serif`;
-      } else if (options.fontType === "cnormal") {
+      }
+      if (options.fontType === "cnormal") {
         options.cssFont = `normal ${options.size}px sans-serif`;
-      } else if (options.fontType === "auto") {
+      }
+      if (options.fontType === "auto") {
         options.cssFont = `${options.size}px sans-serif`;
       }
     }
@@ -313,7 +423,9 @@ class CanvCass {
     const { cssFont: font = "" } = style;
     ctx.font = font;
     const result = ctx.measureText(style.text);
+
     ctx.restore();
+
     return result;
   }
 
@@ -372,7 +484,8 @@ class CanvCass {
     const ctx = this._context;
 
     let image;
-    if (typeof imageOrSrc !== "string") {
+
+    if (typeof imageOrSrc !== "string" && "onload" in imageOrSrc) {
       image = imageOrSrc;
     } else {
       image = await CanvCass.loadImage(imageOrSrc);
@@ -380,48 +493,92 @@ class CanvCass {
 
     ctx.save();
 
-    let clipPath = null;
     if (options.clipTo) {
-      clipPath = options.clipTo;
-    } else {
+      ctx.clip(options.clipTo);
+    }
+
+    let width = options.width;
+    let height = options.height;
+
+    if (width && !height) {
+      height = (width / image.width) * image.height;
+    } else if (!width && height) {
+      width = (height / image.height) * image.width;
+    } else if (!width && !height) {
+      width = image.width;
+      height = image.height;
+    }
+
+    let drawWidth = width;
+    let drawHeight = height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    const fit = options.fit || 'none'; // Add fit option: 'contain', 'cover', or 'none'
+
+    if (fit === 'contain' || fit === 'cover') {
+      const imgRatio = image.width / image.height;
+      const targetRatio = width / height;
+
+      let scale;
+      if (fit === 'contain') {
+        scale = Math.min(width / image.width, height / image.height);
+      } else { // 'cover'
+        scale = Math.max(width / image.width, height / image.height);
+      }
+
+      drawWidth = image.width * scale;
+      drawHeight = image.height * scale;
+
+      offsetX = (width - drawWidth) / 2;
+      offsetY = (height - drawHeight) / 2;
+    } else if (options.maximizeFit) { // Legacy, treat as contain
+      const ratio = image.width / image.height;
+      if (width > height * ratio) {
+        drawWidth = height * ratio;
+      } else if (height > width / ratio) {
+        drawHeight = width / ratio;
+      }
+      // Add centering for legacy maximizeFit
+      offsetX = (width - drawWidth) / 2;
+      offsetY = (height - drawHeight) / 2;
+    }
+
+    if (!options.clipTo) {
       const r = CanvCass.createRect({
-        width: options.width || image.width,
-        height: options.height || image.height,
+        width,
+        height,
         left,
         top,
       });
-      clipPath = CanvCass.rectToPath(r);
+      ctx.clip(CanvCass.rectToPath(r));
     }
-    ctx.clip(clipPath);
-
-    let sourceX = options.sourceOffsetLeft ?? 0;
-    let sourceY = options.sourceOffsetTop ?? 0;
-    let sourceWidth = options.cropWidth ?? image.width;
-    let sourceHeight = options.cropHeight ?? image.height;
-    let destWidth = options.width ?? image.width;
-    let destHeight = options.height ?? image.height;
-
-    if (options.fit === 'cover') {
-      const scale = Math.max(destWidth / image.width, destHeight / image.height);
-      sourceWidth = destWidth / scale;
-      sourceHeight = destHeight / scale;
-      sourceX = (image.width - sourceWidth) / 2;
-      sourceY = (image.height - sourceHeight) / 2;
-    }
-
     ctx.drawImage(
       image,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      left,
-      top,
-      destWidth,
-      destHeight
+      options.sourceOffsetLeft ?? 0,
+      options.sourceOffsetTop ?? 0,
+      options.cropWidth ?? image.width,
+      options.cropHeight ?? image.height,
+      left + offsetX,
+      top + offsetY,
+      drawWidth,
+      drawHeight
     );
 
     ctx.restore();
+  }
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isValidURL(str) {
+  try {
+    new URL(str);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -434,7 +591,7 @@ const meta = {
     {
       name: 'headline',
       description: 'The headline text for the satire news',
-      example: 'he love Jea',
+      example: 'He love Jea',
       required: true
     },
     {
@@ -482,153 +639,162 @@ async function onStart({ req, res }) {
 
   const isBgDifferent = bg !== pfp;
 
+  if (!setupDone) {
+    await CanvCass.singleSetup();
+    setupDone = true;
+  }
+
   headline = `${name} claims that ${headline}`;
 
-  try {
-    const canv = new CanvCass({ width: 720, height: 720 });
-    const margin = 55;
+  let times = 0;
 
-    const bgImage = await CanvCass.loadImage(bg);
-    await canv.drawImage(bgImage, canv.left, canv.top, {
-      width: canv.width,
-      height: canv.height,
-      fit: 'cover',
-    });
+  while (true) {
+    times++;
+    try {
+      const canv = new CanvCass(1080, 1080); // Increased resolution for higher quality
+      await canv.drawBackground();
+      const margin = 80; // Scaled up margin for higher res
 
-    const bottomHalf = CanvCass.createRect({
-      bottom: canv.bottom,
-      left: 0,
-      width: canv.width,
-      height: canv.height / 1.1,
-    });
-    const gradient = canv.createDim(bottomHalf, { color: "rgba(0,0,0,1)" });
-    canv.drawBox({ rect: bottomHalf, fill: gradient });
+      await delay(500);
+      const bgImage = await CanvCass.loadImage(bg);
+      await canv.drawImage(bgImage, canv.left, canv.top, {
+        width: canv.width,
+        height: canv.height,
+        fit: 'cover', // Use cover fit for background to fill without distortion
+      });
 
-    const headlineRect = CanvCass.createRect({
-      top: canv.bottom - 200,
-      left: margin,
-      width: canv.width - margin * 2,
-      height: 100,
-    });
-    const headlineResult = canv.drawText({
-      text: headline,
-      align: "left",
-      vAlign: "top",
-      baseline: "middle",
-      fontType: "cbold",
-      size: 38,
-      fill: "white",
-      x: headlineRect.left,
-      breakTo: "top",
-      y: headlineRect.bottom,
-      breakMaxWidth: headlineRect.width,
-      yMargin: 4,
-    });
+      const bottomHalf = CanvCass.createRect({
+        bottom: canv.bottom,
+        left: 0,
+        width: canv.width,
+        height: canv.height / 1.1,
+      });
+      const gradient = canv.createDim(bottomHalf, { color: "rgba(0,0,0,1)" });
+      canv.drawBox({ rect: bottomHalf, fill: gradient });
 
-    if (isBgDifferent || true) {
-      const cw = (canv.width - margin * 2) / 3;
+      const headlineRect = CanvCass.createRect({
+        top: canv.bottom - 300, // Scaled up
+        left: margin,
+        width: canv.width - margin * 2,
+        height: 150, // Scaled up
+      });
+      const headlineResult = canv.drawText(headline, {
+        align: "left",
+        vAlign: "top",
+        baseline: "middle",
+        fontType: "cbold",
+        size: 57, // Scaled up font size for higher res
+        fill: "white",
+        x: headlineRect.left,
+        breakTo: "top",
+        y: headlineRect.bottom,
+        breakMaxWidth: headlineRect.width,
+        yMargin: 6, // Scaled up
+      });
 
-      const circleBox = CanvCass.createRect({
+      if (isBgDifferent || 1) {
+        const cw = (canv.width - margin * 2) / 3;
+
+        const circleBox = CanvCass.createRect({
+          left: canv.left + margin,
+          bottom: headlineResult.rect.top - headlineResult.lineHeight / 2,
+          width: cw,
+          height: cw,
+        });
+
+        const ccc = [circleBox.centerX, circleBox.centerY];
+        const r = cw / 2;
+
+        const circlePath = CanvCass.createCirclePath(ccc, r);
+        await delay(500);
+
+        const pfpImage = await CanvCass.loadImage(pfp);
+        await canv.drawImage(pfpImage, circleBox.left, circleBox.top, {
+          width: cw,
+          height: cw,
+          clipTo: circlePath,
+          fit: 'cover', // Use cover fit to fill circle without distortion
+        });
+
+        canv.drawCircle(ccc, r, { stroke: CanvCass.colorA, strokeWidth: 8 }); // Thicker stroke for premium look
+      }
+
+      const lineH = 6; // Scaled up
+      const lineTop = headlineRect.bottom + 30; // Scaled up
+      const lineLeft = margin;
+      const lineW = canv.width - margin * 2;
+
+      const lineRectA = CanvCass.createRect({
+        top: lineTop,
+        left: lineLeft,
+        width: lineW / 2,
+        height: lineH,
+      });
+      const lineRectB = CanvCass.createRect({
+        top: lineTop,
+        left: lineLeft + lineW / 2,
+        width: lineW / 2,
+        height: lineH,
+      });
+      canv.drawBox({ rect: lineRectA, fill: CanvCass.colorA });
+      canv.drawBox({ rect: lineRectB, fill: CanvCass.colorB });
+
+      const logoRect = CanvCass.createRect({
+        width: canv.width - margin * 2,
+        height: 30, // Scaled up
         left: canv.left + margin,
-        bottom: headlineResult.rect.top - headlineResult.lineHeight / 2,
-        width: cw,
-        height: cw,
+        top: lineRectA.bottom + 15, // Scaled up
       });
 
-      const ccc = [circleBox.centerX, circleBox.centerY];
-      const r = cw / 2;
+      const titleText = "News";
+      const titleFontType = "cbold";
+      const titleSize = logoRect.height;
 
-      const circlePath = CanvCass.createCirclePath(ccc, r);
-
-      const pfpImage = await CanvCass.loadImage(pfp);
-      await canv.drawImage(pfpImage, circleBox.left, circleBox.top, {
-        width: cw,
-        height: cw,
-        clipTo: circlePath,
-        fit: 'cover',
+      canv.drawText(titleText, {
+        align: "left",
+        vAlign: "top",
+        fontType: titleFontType,
+        size: titleSize,
+        x: logoRect.left,
+        y: logoRect.bottom,
+        fill: "cyan",
       });
 
-      canv.drawCircle({
-        center: ccc,
-        radius: r,
-        stroke: CanvCass.colorA,
-        strokeWidth: 5
+      const subtitleText = "News and Nonsense";
+      const subtitleFontType = "cnormal";
+      const subtitleSize = 15; // Scaled up
+
+      canv.drawText(subtitleText, {
+        align: "left",
+        vAlign: "bottom",
+        fontType: subtitleFontType,
+        size: subtitleSize,
+        x: logoRect.left,
+        y: logoRect.bottom + 3, // Scaled up
+        fill: "white",
       });
+
+      canv.drawText("Note: This is purely a work of satire", {
+        align: "right",
+        vAlign: "top",
+        baseline: "middle",
+        fontType: "cnormal",
+        size: 22, // Scaled up
+        fill: "rgba(255,255,255,0.6)",
+        x: logoRect.right,
+        y: logoRect.bottom,
+      });
+
+      const buffer = canv.toPng();
+      res.type('image/png').send(buffer);
+      break;
+    } catch (error) {
+      if (times >= 4) {
+        return res.status(500).json({ error: error.message || 'Internal server error' });
+      }
+      await delay(1000);
+      continue;
     }
-
-    const lineH = 4;
-    const lineTop = headlineRect.bottom + 20;
-    const lineLeft = margin;
-    const lineW = canv.width - margin * 2;
-
-    const lineRectA = CanvCass.createRect({
-      top: lineTop,
-      left: lineLeft,
-      width: lineW / 2,
-      height: lineH,
-    });
-    const lineRectB = CanvCass.createRect({
-      top: lineTop,
-      left: lineLeft + lineW / 2,
-      width: lineW / 2,
-      height: lineH,
-    });
-    canv.drawBox({ rect: lineRectA, fill: CanvCass.colorA });
-    canv.drawBox({ rect: lineRectB, fill: CanvCass.colorB });
-
-    const logoRect = CanvCass.createRect({
-      width: canv.width - margin * 2,
-      height: 20,
-      left: canv.left + margin,
-      top: lineRectA.bottom + 10,
-    });
-
-    const titleText = "News";
-    const titleFontType = "cbold";
-    const titleSize = logoRect.height;
-
-    canv.drawText({
-      text: titleText,
-      align: "left",
-      vAlign: "top",
-      fontType: titleFontType,
-      size: titleSize,
-      x: logoRect.left,
-      y: logoRect.bottom,
-      fill: "cyan",
-    });
-
-    const subtitleText = "News and Nonsense";
-    const subtitleFontType = "cnormal";
-    const subtitleSize = 10;
-
-    canv.drawText({
-      text: subtitleText,
-      align: "left",
-      vAlign: "bottom",
-      fontType: subtitleFontType,
-      size: subtitleSize,
-      x: logoRect.left,
-      y: logoRect.bottom + 2,
-      fill: "white",
-    });
-
-    canv.drawText({
-      text: "Note: This is purely a work of satire",
-      align: "right",
-      vAlign: "top",
-      baseline: "middle",
-      fontType: "cnormal",
-      size: 15,
-      fill: "rgba(255,255,255,0.6)",
-      x: logoRect.right,
-      y: logoRect.bottom,
-    });
-
-    const buffer = canv.toPng();
-    res.type('image/png').send(buffer);
-  } catch (error) {
-    return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }
 
