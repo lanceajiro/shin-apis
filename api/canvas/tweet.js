@@ -107,14 +107,14 @@ function roundedRect(ctx, x, y, w, h, r) {
 }
 
 async function onStart({ req, res }) {
-  let text, name = 'Doji Creates', handle = '@dojicreates', avatar_url = null,
+  let text, name = 'Doji Creates', username = '@dojicreates', avatar_url = null,
       time = '2:17 AM', day = 'Tuesday', views = '192.6K Views',
-      tag = 'CODING LESSONS AND CODING MEMES', verified = true, options;
+      tag = 'CODING LESSONS AND CODING MEMES', verified = true, theme;
 
   if (req.method === 'POST') {
-    ({ text, name, handle, avatar_url, time, day, views, tag, verified, options } = req.body);
+    ({ text, name, username, avatar_url, time, day, views, tag, verified, theme } = req.body);
   } else {
-    ({ text, name, handle, avatar_url, time, day, views, tag, verified, options } = req.query);
+    ({ text, name, username, avatar_url, time, day, views, tag, verified, theme } = req.query);
   }
 
   if (!text) {
@@ -124,7 +124,7 @@ async function onStart({ req, res }) {
   }
 
   verified = verified === 'true' || verified === true;
-  const mode = (options || 'light').toLowerCase();
+  const mode = (theme || 'light').toLowerCase();
 
   const theme_list = {
     light: {
@@ -250,7 +250,7 @@ async function onStart({ req, res }) {
     // Handle
     ctx.font = '14px Helvetica, Arial, sans-serif';
     ctx.fillStyle = colors.handle;
-    ctx.fillText(handle, nameX, nameY + 20);
+    ctx.fillText(username, nameX, nameY + 20);
 
     // Text bubble
     const bubbleX = 30;
