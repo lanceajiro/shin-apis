@@ -60,7 +60,8 @@ const meta = {
       name: 'verified',
       description: 'Whether to show verified badge (true/false)',
       example: 'true',
-      required: false
+      required: false,
+      options: ['true', 'false']
     },
     {
       name: 'theme',
